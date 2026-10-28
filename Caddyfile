@@ -1,0 +1,21 @@
+{
+	servers {
+		trusted_proxies static private_ranges
+	}
+}
+
+{$DOMAIN} {
+	root * /srv
+	encode zstd gzip
+	file_server
+	# the game checks version.json to reload a new build; the pages are revalidated
+	header /jeu/version.json Cache-Control "no-store"
+	header /jeu/index.html Cache-Control "no-cache"
+	header /jeu/ Cache-Control "no-cache"
+	header / Cache-Control "no-cache"
+	header /jeu/php-web.* Cache-Control "public, max-age=3600"
+	header {
+		X-Content-Type-Options nosniff
+		Referrer-Policy strict-origin-when-cross-origin
+	}
+}

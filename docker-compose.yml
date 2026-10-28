@@ -1,0 +1,45 @@
+# Site du jeu Sapiens (page d'accueil + jeu JumPHP compilé en WebAssembly, fichiers statiques).
+#   caddy : TLS (certificat Let's Encrypt de ${DOMAIN}) et fichiers de ./www ; Traefik lui passe le TLS tel quel
+#           (routeur TCP HostSNI + passthrough) et le port 80 (challenge ACME) : la config Traefik n'est pas touchée.
+#
+#   docker compose up -d        (./deploy.sh depuis le poste de dev : nouvelle version du site / du jeu)
+name: sapiens
+
+networks:
+  web:
+    name: traefik_web
+    external: true
+
+volumes:
+  caddy_data:
+  caddy_config:
+
+services:
+  caddy:
+    image: caddy:2.8-alpine
+    restart: unless-stopped
+    environment:
+      DOMAIN: ${DOMAIN}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./www:/srv:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks:
+      - web
+    logging:
+      options: { max-size: "10m", max-file: "3" }
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=traefik_web
+      # port 80 : challenge ACME de Caddy (et redirection vers https)
+      - traefik.http.routers.sapiens-http.rule=Host(`${DOMAIN}`)
+      - traefik.http.routers.sapiens-http.entrypoints=insecure
+      - traefik.http.routers.sapiens-http.service=sapiens-http
+      - traefik.http.services.sapiens-http.loadbalancer.server.port=80
+      # port 443 : le TLS de ${DOMAIN} passe tel quel jusqu'à Caddy
+      - traefik.tcp.routers.sapiens-tls.rule=HostSNI(`${DOMAIN}`)
+      - traefik.tcp.routers.sapiens-tls.entrypoints=secure
+      - traefik.tcp.routers.sapiens-tls.tls.passthrough=true
+      - traefik.tcp.routers.sapiens-tls.service=sapiens-tls
+      - traefik.tcp.services.sapiens-tls.loadbalancer.server.port=443
